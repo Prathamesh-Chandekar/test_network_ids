@@ -1,0 +1,7 @@
+src_ip,src_port,dest_ip,dest_port,protocol,packet_size,duration,label
+192.168.1.10,22,10.0.0.5,3306,TCP,1500,10,normal
+172.16.0.20,80,192.168.2.15,8080,HTTP,200,5,attack
+10.0.0.12,22,172.16.1.8,22,TCP,1600,8,attack
+192.168.2.15,3306,10.0.0.5,3306,SQL,1800,12,attack
+172.16.1.8,80,192.168.1.10,80,HTTP,220,7,normal
+10.0.0.5,22,192.168.2.15,22,TCP,1400,6,attack
