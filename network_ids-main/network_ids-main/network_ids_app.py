@@ -1,23 +1,38 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import joblib
 from st_aggrid import AgGrid, GridOptionsBuilder
+from sklearn.ensemble import IsolationForest
+from sklearn.preprocessing import StandardScaler
 
-# Load the CSV data or use example data if file load fails
+# Load the trained model and scaler
+model = joblib.load('anomaly_model.pkl')
+scaler = joblib.load('scaler.pkl')
+
+# Load sample or real-time data (using example data for simplicity)
 try:
     data = pd.read_csv('/mnt/data/alerts.csv')
     data['timestamp'] = pd.to_datetime(data['timestamp'])
 except:
-    # Example data if CSV not loaded
+    # Generate sample data if CSV is not available
     data = pd.DataFrame({
         'timestamp': pd.date_range(start='2023-01-01', periods=100, freq='H'),
-        'severity': np.random.choice(['Low', 'Medium', 'High'], size=100),
-        'alert_type': np.random.choice(['Port Scan', 'Brute Force', 'DDoS', 'Malware'], size=100),
-        'source': np.random.choice(['192.168.1.1', '192.168.1.2', '10.0.0.1', '10.0.0.2'], size=100),
-        'destination': np.random.choice(['192.168.1.3', '192.168.1.4', '10.0.0.3', '10.0.0.4'], size=100),
+        'byte_count': np.random.randint(100, 10000, size=100),
+        'duration': np.random.randint(1, 100, size=100),
+        'source_port': np.random.randint(1000, 65535, size=100),
+        'dest_port': np.random.randint(1000, 65535, size=100),
     })
 
-# Title with main logo (optional)
+# Feature scaling
+features = data[['byte_count', 'duration', 'source_port', 'dest_port']]
+features_scaled = scaler.transform(features)
+
+# Predict anomalies using the model
+data['anomaly'] = model.predict(features_scaled)
+data['severity'] = data['anomaly'].apply(lambda x: 'High' if x == -1 else 'Low')
+
+# Streamlit Dashboard
 st.title("🔒 Network Intrusion Detection System (NIDS) Dashboard with AI/ML")
 
 # Model Performance Metrics with Icons
@@ -39,39 +54,33 @@ st.header("📊 Anomaly/Security Alerts")
 gb = GridOptionsBuilder.from_dataframe(data)
 gb.configure_pagination(paginationAutoPageSize=True)  # Enable pagination
 gb.configure_side_bar()  # Add a sidebar with filters
-gb.configure_default_column(editable=False, groupable=True, wrapText=True)  # Wrap text to make content visible
-gb.configure_column("severity", cellStyle={"color": "black", "backgroundColor": "lightcoral"})
-gb.configure_column("alert_type", cellStyle={"color": "black", "backgroundColor": "lightblue"})
-gb.configure_column("source", cellStyle={"color": "black", "backgroundColor": "lightyellow"})
-gb.configure_column("destination", cellStyle={"color": "black", "backgroundColor": "lightgreen"})
+gb.configure_default_column(editable=False, groupable=True)
 
+# Apply different colors based on severity
+severity_colors = {
+    "High": "lightcoral",
+    "Low": "lightgreen"
+}
+gb.configure_column("severity", cellStyle=lambda params: {
+    "color": "black",
+    "backgroundColor": severity_colors.get(params.value, "lightgrey")
+})
 grid_options = gb.build()
+
+# Display data with AgGrid
 AgGrid(data, gridOptions=grid_options, theme="material", height=400, fit_columns_on_grid_load=True)
 
-# Traffic Analysis with Icon
+# Traffic Analysis
 st.header("📈 Traffic Analysis")
-
 if 'timestamp' in data.columns:
     traffic_count = data.groupby(data['timestamp'].dt.date).size()
     st.line_chart(traffic_count, width=0, height=400)
 
 # Severity Distribution
-if 'severity' in data.columns:
-    st.subheader("Severity Distribution of Alerts")
-    severity_counts = data['severity'].value_counts()
-    st.bar_chart(severity_counts)
+st.subheader("Severity Distribution of Alerts")
+severity_counts = data['severity'].value_counts()
+severity_chart = st.bar_chart(severity_counts)
 
-# Source/Destination Analysis
-if 'source' in data.columns and 'destination' in data.columns:
-    st.subheader("Top Sources and Destinations")
-    top_sources = data['source'].value_counts().head(5)
-    top_destinations = data['destination'].value_counts().head(5)
-    col5, col6 = st.columns(2)
-    with col5:
-        st.bar_chart(top_sources)
-    with col6:
-        st.bar_chart(top_destinations)
-
-# Additional options
+# Additional options for data exploration
 if st.checkbox("Show Detailed Data Summary"):
     st.write(data.describe())
